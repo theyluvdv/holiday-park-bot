@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Batemans Bay Holiday Park – Customer Service Chat</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f0f4f8;
+    }
+
+    /* ── Floating launcher ── */
+    #chat-launcher {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      background: #1a6b3c;
+      border: none;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+      z-index: 9999;
+      transition: transform 0.2s, background 0.2s;
+    }
+    #chat-launcher:hover { background: #145530; transform: scale(1.08); }
+    #chat-launcher svg { width: 28px; height: 28px; fill: white; }
+
+    /* Notification dot */
+    #chat-launcher .dot {
+      position: absolute;
+      top: 4px; right: 4px;
+      width: 12px; height: 12px;
+      background: #e85d2f;
+      border-radius: 50%;
+      border: 2px solid white;
+    }
+
+    /* ── Chat window ── */
+    #chat-window {
+      position: fixed;
+      bottom: 96px;
+      right: 24px;
+      width: 380px;
+      max-height: 580px;
+      border-radius: 16px;
+      background: white;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.18);
+      display: flex;
+      flex-direction: column;
+      z-index: 9998;
+      overflow: hidden;
+      transform: scale(0.92) translateY(20px);
+      opacity: 0;
+      pointer-events: none;
+      transition: transform 0.25s ease, opacity 0.25s ease;
+    }
+    #chat-window.open {
+      transform: scale(1) translateY(0);
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    /* Header */
+    #chat-header {
+      background: linear-gradient(135deg, #1a6b3c 0%, #2d9e5f 100%);
+      padding: 16px 18px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+    #chat-header .avatar {
+      width: 42px; height: 42px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.2);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; flex-shrink: 0;
+    }
+    #chat-header .info { flex: 1; }
+    #chat-header .name { color: white; font-weight: 700; font-size: 15px; }
+    #chat-header .status {
+      color: rgba(255,255,255,0.8);
+      font-size: 12px;
+      display: flex; align-items: center; gap: 5px;
+    }
+    #chat-header .status-dot {
+      width: 7px; height: 7px;
+      background: #7fff7f;
+      border-radius: 50%;
+    }
+    #close-btn {
+      background: none; border: none; cursor: pointer;
+      color: rgba(255,255,255,0.8); font-size: 22px; line-height: 1;
+      padding: 4px;
+    }
+    #close-btn:hover { color: white; }
+
+    /* Messages */
+    #messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      scroll-behavior: smooth;
+    }
+    #messages::-webkit-scrollbar { width: 4px; }
+    #messages::-webkit-scrollbar-thumb { background: #ddd; border-radius: 4px; }
+
+    .msg {
+      max-width: 82%;
+      padding: 10px 13px;
+      border-radius: 14px;
+      font-size: 14px;
+      line-height: 1.5;
+      animation: fadeUp 0.2s ease;
+    }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .msg.bot {
+      background: #f2f4f7;
+      color: #1a1a1a;
+      align-self: flex-start;
+      border-bottom-left-radius: 4px;
+    }
+    .msg.user {
+      background: #1a6b3c;
+      color: white;
+      align-self: flex-end;
+      border-bottom-right-radius: 4px;
+    }
+    .msg a { color: #1a6b3c; font-weight: 600; }
+    .msg.user a { color: #d4f5e3; }
+
+    /* Typing indicator */
+    .typing {
+      display: flex; gap: 4px; align-items: center;
+      padding: 12px 14px;
+      background: #f2f4f7;
+      border-radius: 14px;
+      border-bottom-left-radius: 4px;
+      align-self: flex-start;
+      width: 56px;
+    }
+    .typing span {
+      width: 7px; height: 7px;
+      background: #999;
+      border-radius: 50%;
+      animation: bounce 1.2s infinite;
+    }
+    .typing span:nth-child(2) { animation-delay: 0.2s; }
+    .typing span:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes bounce {
+      0%, 60%, 100% { transform: translateY(0); }
+      30% { transform: translateY(-6px); }
+    }
+
+    /* Quick replies */
+    #quick-replies {
+      padding: 6px 16px 10px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+    }
+    .qr-btn {
+      background: white;
+      border: 1.5px solid #1a6b3c;
+      color: #1a6b3c;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+      font-weight: 500;
+    }
+    .qr-btn:hover { background: #1a6b3c; color: white; }
+
+    /* Input area */
+    #input-area {
+      border-top: 1px solid #eee;
+      padding: 12px 14px;
+      display: flex;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    #user-input {
+      flex: 1;
+      border: 1.5px solid #ddd;
+      border-radius: 22px;
+      padding: 9px 14px;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    #user-input:focus { border-color: #1a6b3c; }
+    #send-btn {
+      width: 40px; height: 40px;
+      border-radius: 50%;
+      background: #1a6b3c;
+      border: none;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      transition: background 0.2s;
+    }
+    #send-btn:hover { background: #145530; }
+    #send-btn svg { width: 18px; height: 18px; fill: white; }
+
+    /* Responsive */
+    @media (max-width: 440px) {
+      #chat-window { width: calc(100vw - 20px); right: 10px; bottom: 88px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Launcher button -->
+<button id="chat-launcher" aria-label="Open chat">
+  <svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z"/></svg>
+  <span class="dot"></span>
+</button>
+
+<!-- Chat window -->
+<div id="chat-window" role="dialog" aria-label="Customer service chat">
+  <div id="chat-header">
+    <div class="avatar">🏕️</div>
+    <div class="info">
+      <div class="name">Batemans Bay Holiday Park</div>
+      <div class="status"><span class="status-dot"></span> Typically replies instantly</div>
+    </div>
+    <button id="close-btn" aria-label="Close chat">×</button>
+  </div>
+
+  <div id="messages"></div>
+
+  <div id="quick-replies"></div>
+
+  <div id="input-area">
+    <input id="user-input" type="text" placeholder="Type your question…" autocomplete="off" />
+    <button id="send-btn" aria-label="Send message">
+      <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+    </button>
+  </div>
+</div>
+
+<script>
+  // ─── Knowledge base ───────────────────────────────────────────────────
+  const PARK = {
+    name: "Batemans Bay Holiday Park",
+    phone: "02 4472 4972",
+    bookingUrl: "https://ibe12.rmscloud.com/9830E8001DD933F3/1",
+    website: "https://www.batemansbayholidaypark.com.au"
+  };
+
+  const TOPICS = {
+    book: {
+      keywords: ["book", "booking", "reserve", "reservation", "availability", "available", "price", "cost", "rate", "tariff", "check availability"],
+      response: () => `To check availability and book online, head to our booking page:\n\n👉 <a href="${PARK.bookingUrl}" target="_blank">Book Now</a>\n\nYou can browse all available site types, dates and pricing there. Need help picking the right option? Just ask!`
+    },
+    checkin: {
+      keywords: ["check in", "check-in", "checkin", "check out", "check-out", "checkout", "arrival", "depart", "departure", "time", "hours", "arrive"],
+      response: () => `⏰ <strong>Check-in:</strong> From 2:00 PM\n⏰ <strong>Check-out:</strong> By 10:00 AM\n\nIf you're arriving after 5:30 PM, please give us a call ahead of time so we can arrange access:\n📞 <a href="tel:0244724972">${PARK.phone}</a>`
+    },
+    accommodation: {
+      keywords: ["accommodation", "stay", "room", "cabin", "site", "van", "caravan", "dorm", "twin", "bunk", "powered", "annual", "family", "couple", "ensuite", "types", "options", "sleep"],
+      response: () => `We offer four types of accommodation:\n\n🏠 <strong>Holiday Cabins</strong> – Family ensuites (up to 4), Queen/Double ensuites for couples, and Premium Family (up to 5). All include linen, towels, kitchenette & private bathroom. Pet-friendly options available.\n\n⚡ <strong>Powered Sites</strong> – For tents or caravans with power & water access.\n\n🏠 <strong>Dorm Style (YHA)</strong> – Twin rooms (2 singles) and bunk rooms (3 bunks). Shared kitchen, toilets, showers & laundry. Linen supplied.\n\n🚐 <strong>Annual Vans</strong> – Owner-occupied vans, up to 180 days/year. Quarterly site fee $1,200.\n\n👉 <a href="${PARK.bookingUrl}" target="_blank">Check availability & pricing</a>`
+    },
+    pets: {
+      keywords: ["pet", "dog", "cat", "animal", "fur", "puppy", "kitten", "friendly"],
+      response: () => `🐾 <strong>Pet Policy:</strong>\n\n✅ <strong>Pet-friendly cabins</strong> – Available for some of our cabins. You <strong>must call the office</strong> to check availability before booking as these are limited. Pet fees apply.\n\n✅ <strong>Your own caravan or tent</strong> – Pets are welcome. Fees apply.\n\n❌ <strong>Dorm-style accommodation</strong> – No pets permitted (includes Double Caravans and all shared rooms).\n\n📞 Call us to arrange a pet-friendly booking: <a href="tel:0244724972">${PARK.phone}</a>`
+    },
+    linen: {
+      keywords: ["linen", "towel", "bedding", "sheet", "bed", "pillow", "blanket", "bring"],
+      response: () => `🛏️ <strong>Linen & Towels:</strong>\n\nAll cabins come with linen and towels included – rooms are made up and ready to go on arrival.\n\nDorm-style rooms (Twin & Bunk) also include bed linen.\n\nPowered sites: please bring your own linen and towels.`
+    },
+    caravan: {
+      keywords: ["caravan", "double caravan", "van capacity", "how many in caravan", "caravan guests"],
+      response: () => `🚐 <strong>Caravans:</strong>\n\nOur Double Caravans are suitable for <strong>2 guests only</strong> and cannot accommodate extra guests, including children.\n\nFor families, we recommend our Holiday Cabins instead. <a href="${PARK.bookingUrl}" target="_blank">Check availability here.</a>`
+    },
+    facilities: {
+      keywords: ["facilit", "pool", "bbq", "barbeque", "barbecue", "playground", "laundry", "wifi", "internet", "tennis", "recreation", "gym", "amenities", "dump point", "foxtel"],
+      response: () => `🏊 <strong>Facilities include:</strong>\n\n🏊 Seasonal outdoor pool\n🍖 BBQ area\n🛝 Children's playground\n🎾 Tennis court (free equipment at reception – bookings required in peak times)\n🎮 Recreation room with Foxtel & games (8am–10pm)\n🧺 Coin-operated laundry (change at reception)\n📶 Free WiFi throughout\n🚐 Dump point for caravans`
+    },
+    location: {
+      keywords: ["location", "where", "address", "directions", "map", "find", "town", "far", "distance"],
+      response: () => `📍 We're located on the South Coast of NSW, just a <strong>10-minute walk</strong> from Batemans Bay township.\n\nFor directions, visit our website:\n👉 <a href="${PARK.website}/contact" target="_blank">Contact & Directions</a>\n\nOr give us a call: 📞 <a href="tel:0244724972">${PARK.phone}</a>`
+    },
+    deposit: {
+      keywords: ["deposit", "payment", "pay", "upfront", "prepay", "season", "high season", "off season", "xmas", "christmas", "easter", "october"],
+      response: () => `💳 <strong>Deposit Requirements:</strong>\n\n📅 <strong>Off & Mid Season:</strong> 1 night deposit required to secure your booking.\n\n🌟 <strong>High Season</strong> (Christmas, Easter & October Long Weekend): Half the total tariff is required as deposit.\n\nA credit card will also be required at check-in to cover any incidental charges. You must be 18+ to book.`
+    },
+    cancel: {
+      keywords: ["cancel", "cancellation", "refund", "change booking", "modify", "reschedule", "move booking", "change date", "different date"],
+      response: () => `📋 <strong>Cancellations & Changes:</strong>\n\n• An <strong>administration fee</strong> applies to all booking changes and cancellations.\n• Cancellation penalties depend on the accommodation provider's policy at the time of booking.\n• We recommend reviewing the full terms when booking.\n\n<strong>To reschedule or cancel your booking:</strong>\n\n1️⃣ First, try managing your booking through the booking portal:\n👉 <a href="${PARK.bookingUrl}" target="_blank">Manage My Booking</a>\n\n2️⃣ If you need help, call us directly:\n📞 <a href="tel:0244724972">${PARK.phone}</a>\n\nWe'll do our best to accommodate your request.`
+    },
+    human: {
+      keywords: ["human", "person", "staff", "speak", "talk", "call", "phone", "help", "contact", "reception", "real person", "agent", "representative"],
+      response: () => `👋 Happy to connect you with our team!\n\n📞 <strong>Call us:</strong> <a href="tel:0244724972">${PARK.phone}</a>\n\nOur reception team are ready to help with bookings, pet-friendly queries, special requests and anything else you need.\n\nYou can also visit our website:\n🌐 <a href="${PARK.website}" target="_blank">${PARK.website}</a>`
+    }
+  };
+
+  const QUICK_REPLY_OPTIONS = [
+    { label: "📅 Make a booking", topic: "book" },
+    { label: "🏠 Accommodation types", topic: "accommodation" },
+    { label: "🐾 Pet policy", topic: "pets" },
+    { label: "⏰ Check-in times", topic: "checkin" },
+    { label: "🏊 Facilities", topic: "facilities" },
+    { label: "❌ Cancel / Reschedule", topic: "cancel" },
+    { label: "💬 Talk to staff", topic: "human" }
+  ];
+
+  // ─── DOM refs ─────────────────────────────────────────────────────────
+  const launcher    = document.getElementById('chat-launcher');
+  const chatWindow  = document.getElementById('chat-window');
+  const closeBtn    = document.getElementById('close-btn');
+  const messages    = document.getElementById('messages');
+  const quickReplies = document.getElementById('quick-replies');
+  const userInput   = document.getElementById('user-input');
+  const sendBtn     = document.getElementById('send-btn');
+
+  let isOpen = false;
+
+  // ─── Open / close ─────────────────────────────────────────────────────
+  function openChat() {
+    isOpen = true;
+    chatWindow.classList.add('open');
+    launcher.querySelector('.dot').style.display = 'none';
+    if (messages.children.length === 0) showWelcome();
+    setTimeout(() => userInput.focus(), 300);
+  }
+
+  function closeChat() {
+    isOpen = false;
+    chatWindow.classList.remove('open');
+  }
+
+  launcher.addEventListener('click', () => isOpen ? closeChat() : openChat());
+  closeBtn.addEventListener('click', closeChat);
+
+  // ─── Welcome message ──────────────────────────────────────────────────
+  function showWelcome() {
+    addBotMessage(`👋 G'day! Welcome to <strong>Batemans Bay Holiday Park</strong>.\n\nI'm here to help you with bookings, accommodation info, park facilities, cancellations and more.\n\nWhat can I help you with today?`);
+    renderQuickReplies(QUICK_REPLY_OPTIONS);
+  }
+
+  // ─── Render quick replies ─────────────────────────────────────────────
+  function renderQuickReplies(options) {
+    quickReplies.innerHTML = '';
+    options.forEach(opt => {
+      const btn = document.createElement('button');
+      btn.className = 'qr-btn';
+      btn.textContent = opt.label;
+      btn.addEventListener('click', () => {
+        addUserMessage(opt.label);
+        clearQuickReplies();
+        const response = TOPICS[opt.topic]?.response();
+        if (response) showTypingThen(response);
+      });
+      quickReplies.appendChild(btn);
+    });
+  }
+
+  function clearQuickReplies() {
+    quickReplies.innerHTML = '';
+  }
+
+  // ─── Message rendering ────────────────────────────────────────────────
+  function addBotMessage(html) {
+    const el = document.createElement('div');
+    el.className = 'msg bot';
+    el.innerHTML = html.replace(/\n/g, '<br>');
+    messages.appendChild(el);
+    scrollDown();
+  }
+
+  function addUserMessage(text) {
+    const el = document.createElement('div');
+    el.className = 'msg user';
+    el.textContent = text;
+    messages.appendChild(el);
+    scrollDown();
+  }
+
+  function showTypingThen(html, delay = 900) {
+    const typing = document.createElement('div');
+    typing.className = 'typing';
+    typing.innerHTML = '<span></span><span></span><span></span>';
+    messages.appendChild(typing);
+    scrollDown();
+
+    setTimeout(() => {
+      typing.remove();
+      addBotMessage(html);
+      // Show quick replies again after bot responds
+      renderQuickReplies(QUICK_REPLY_OPTIONS);
+    }, delay);
+  }
+
+  function scrollDown() {
+    setTimeout(() => { messages.scrollTop = messages.scrollHeight; }, 50);
+  }
+
+  // ─── NLP matching ────────────────────────────────────────────────────
+  function findBestMatch(text) {
+    const lower = text.toLowerCase();
+    let bestTopic = null;
+    let bestScore = 0;
+
+    for (const [key, topic] of Object.entries(TOPICS)) {
+      const score = topic.keywords.reduce((acc, kw) => {
+        return lower.includes(kw.toLowerCase()) ? acc + kw.length : acc;
+      }, 0);
+      if (score > bestScore) {
+        bestScore = score;
+        bestTopic = key;
+      }
+    }
+
+    return bestScore > 0 ? bestTopic : null;
+  }
+
+  // ─── Handle user input ────────────────────────────────────────────────
+  function handleInput() {
+    const text = userInput.value.trim();
+    if (!text) return;
+    userInput.value = '';
+    addUserMessage(text);
+    clearQuickReplies();
+
+    const match = findBestMatch(text);
+    if (match) {
+      showTypingThen(TOPICS[match].response());
+    } else {
+      showTypingThen(`I'm not sure about that one! Here are some things I can help with — or give us a call directly:\n\n📞 <a href="tel:0244724972">${PARK.phone}</a>`);
+      setTimeout(() => renderQuickReplies(QUICK_REPLY_OPTIONS), 1100);
+    }
+  }
+
+  sendBtn.addEventListener('click', handleInput);
+  userInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter') handleInput();
+  });
+
+  // ─── Auto-open after 3s (optional) ───────────────────────────────────
+  // setTimeout(openChat, 3000);
+</script>
+</body>
+</html>
